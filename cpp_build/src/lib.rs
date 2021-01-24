@@ -9,7 +9,6 @@
 extern crate cc;
 extern crate cpp_common;
 extern crate proc_macro2;
-extern crate regex;
 extern crate syn;
 extern crate unicode_xid;
 

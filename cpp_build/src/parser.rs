@@ -1,5 +1,4 @@
 use cpp_common::{Class, Closure, Macro, RustInvocation};
-use regex::Regex;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
@@ -235,15 +234,24 @@ fn skip_literal(mut input: Cursor) -> PResult<bool> {
         }
         return Ok((input.advance(1), true));
     }
-    lazy_static! {
-        static ref RAW: Regex = Regex::new(r##"^b?r#*""##).unwrap();
-    }
-    if RAW.is_match(input.rest) {
+    if is_raw_string(input.rest) {
         let q = input.rest.find('r').unwrap();
         input = input.advance(q + 1);
         return raw_string(input).map(|x| (x.0, true));
     }
     Ok((input, false))
+}
+
+fn is_raw_string(input: &str) -> bool {
+    let offset = if input.starts_with("br#") {
+        3
+    } else if input.starts_with("r#") {
+        2
+    } else {
+        return false;
+    };
+
+    input.chars().skip(offset).find(|c| *c != '#') == Some('"')
 }
 
 fn new_cursor(s: &str) -> Cursor {
@@ -260,6 +268,9 @@ fn test_skip_literal() -> Result<(), LexError> {
     assert!((skip_literal(new_cursor(r#""fofofo"ok xx"#))?.0).starts_with("ok"));
     assert!((skip_literal(new_cursor(r#""kk\"kdk"ok xx"#))?.0).starts_with("ok"));
     assert!((skip_literal(new_cursor("r###\"foo \" bar \\\" \"###ok xx"))?.0).starts_with("ok"));
+    assert!((skip_literal(new_cursor("r#\"foo \" bar \\\" \"#ok xx"))?.0).starts_with("ok"));
+    assert!((skip_literal(new_cursor("br#\"foo \" bar \\\" \"#ok xx"))?.0).starts_with("ok"));
+    assert!((skip_literal(new_cursor("r###foo\""))?.0).starts_with("r###foo\""));
     assert!(
         (skip_literal(new_cursor("br###\"foo 'jjk' \" bar \\\" \"###ok xx"))?.0).starts_with("ok")
     );
